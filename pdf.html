@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Image to PDF - DSH Tools</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    
+    <!-- Library jsPDF buat bikin file PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <style>
+        :root {
+            --bg-main: #EAEAEA;
+            --border-color: #000000;
+            --card-bg: #FFFFFF;
+            --text-color: #000000;
+            --sticky-bg: #000000;
+            --sticky-text: #FFFFFF;
+            --shadow: 6px 6px 0px #000000;
+            --spinner-border: #EAEAEA;
+            --spinner-top: #000000;
+            --yellow: #FFE600;
+            --pink: #FF66CC;
+            --green: #00FF85;
+            --blue: #00C2FF;
+            --gray: #B0B0B0;
+            --orange: #FF8C00; /* Warna khusus PDF */
+        }
+
+        /* DARK MODE BRUTALISM */
+        .dark-mode {
+            --bg-main: #0d0d0d;
+            --border-color: #FFFFFF;
+            --card-bg: #1A1A1A;
+            --text-color: #FFFFFF;
+            --sticky-bg: #0d0d0d;
+            --sticky-text: #FFFFFF;
+            --shadow: 6px 6px 0px #FFFFFF;
+            --spinner-border: #1A1A1A;
+            --spinner-top: #FFFFFF;
+            --yellow: #FFFFFF;
+        }
+
+        /* PERBAIKAN NAVBAR DI DARK MODE */
+        .dark-mode .navbar { background: var(--sticky-bg); }
+        .dark-mode .logo { background: var(--card-bg); color: var(--text-color); }
+        .dark-mode .nav-links a { color: var(--text-color); }
+        .dark-mode .theme-btn { background: var(--card-bg); color: var(--text-color); }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Space Mono', monospace; }
+
+        html, body {
+            height: 100%; overflow: hidden;
+            background-color: var(--bg-main); color: var(--text-color);
+            transition: background-color 0.2s, color 0.2s;
+        }
+
+        .app-shell { display: flex; flex-direction: column; height: 100vh; height: 100dvh; width: 100%; }
+
+        /* NAVBAR */
+        .navbar {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 0.75rem 5%; background: var(--orange);
+            border-bottom: 4px solid var(--border-color); flex-shrink: 0; z-index: 100;
+        }
+        .nav-group { display: flex; align-items: center; gap: 1rem; }
+        .logo {
+            font-family: 'Archivo Black', sans-serif; font-size: 1.5rem; text-transform: uppercase;
+            text-decoration: none; color: var(--text-color); background: var(--card-bg);
+            padding: 0.25rem 1rem; border: 3px solid var(--border-color); box-shadow: 3px 3px 0px var(--border-color);
+        }
+        .nav-links a {
+            text-decoration: none; color: var(--text-color); font-weight: 700; font-size: 1.1rem;
+            text-transform: uppercase; border-bottom: 3px solid transparent; transition: border-color 0.1s;
+        }
+        .nav-links a:hover { border-bottom: 3px solid var(--border-color); }
+        .theme-btn {
+            background: var(--card-bg); color: var(--text-color); border: 3px solid var(--border-color);
+            box-shadow: 3px 3px 0px var(--border-color); width: 40px; height: 40px; font-size: 1.2rem;
+            cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.1s;
+        }
+        .theme-btn:hover { transform: translate(2px, 2px); box-shadow: none; }
+
+        /* AREA SCROLL */
+        .scrollable-content {
+            flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; background-color: var(--bg-main);
+        }
+        .tool-container { max-width: 1000px; margin: 3rem auto; padding: 0 1rem 3rem; }
+        .tool-title { font-family: 'Archivo Black', sans-serif; font-size: 3rem; text-transform: uppercase; margin-bottom: 1rem; line-height: 1; }
+        .tool-desc { font-size: 1.1rem; font-weight: 700; margin-bottom: 2rem; background: var(--text-color); color: var(--bg-main); padding: 0.5rem 1rem; display: inline-block; }
+
+        /* DRAG & DROP AREA */
+        .drop-zone {
+            background: var(--card-bg); border: 4px dashed var(--border-color); padding: 4rem 2rem;
+            text-align: center; cursor: pointer; transition: 0.2s; box-shadow: var(--shadow);
+            margin-bottom: 2rem; color: var(--text-color);
+        }
+        .drop-zone:hover { background: var(--blue); transform: scale(1.01); color: #000; }
+        .drop-zone.dragover { background: var(--green); border-style: solid; transform: scale(1.02); color: #000; }
+        .drop-zone h3 { font-family: 'Archivo Black', sans-serif; font-size: 1.5rem; margin-bottom: 0.5rem; }
+        .drop-zone p { font-size: 0.9rem; font-weight: 700; text-transform: uppercase; }
+        #fileInput { display: none; }
+
+        /* FULLSCREEN OVERLAY */
+        .fs-drop-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85); display: none; justify-content: center; align-items: center;
+            z-index: 9998; pointer-events: none;
+        }
+        .fs-drop-overlay.active { display: flex; }
+        .fs-drop-overlay h2 {
+            font-family: 'Archivo Black', sans-serif; font-size: 4rem; text-transform: uppercase;
+            color: var(--text-color); border: 8px dashed var(--border-color); padding: 3rem;
+            background: var(--card-bg); text-align: center; max-width: 80vw;
+        }
+
+        /* PREVIEW & GRID */
+        .preview-section { display: none; }
+        .preview-section.active { display: block; }
+        .image-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1.5rem; }
+        .image-card {
+            border: 4px solid var(--border-color); background: var(--card-bg); padding: 1rem;
+            display: flex; flex-direction: column; align-items: center; text-align: center;
+            box-shadow: var(--shadow); min-height: 200px; justify-content: space-between;
+            position: relative; color: var(--text-color);
+        }
+        .card-delete-btn {
+            position: absolute; top: -15px; right: -15px; background: var(--pink); color: #000;
+            border: 3px solid var(--border-color); width: 35px; height: 35px;
+            font-family: 'Archivo Black', sans-serif; cursor: pointer;
+            box-shadow: 3px 3px 0px var(--border-color); transition: 0.1s; z-index: 10;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .card-delete-btn:hover { transform: translate(2px, 2px); box-shadow: none; }
+        .image-card img {
+            max-width: 100%; max-height: 100px; border: 3px solid var(--border-color);
+            background: repeating-conic-gradient(#EAEAEA 0% 25%, #FFFFFF 0% 50%) 50% / 20px 20px;
+            margin-bottom: 0.5rem;
+        }
+        .card-info { font-size: 0.8rem; font-weight: 700; margin-bottom: 0.5rem; }
+
+        /* SPINNER */
+        .spinner {
+            border: 4px solid var(--spinner-border); border-top: 4px solid var(--spinner-top);
+            border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 20px auto;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* STICKY BAR BAWAH */
+        .sticky-bar {
+            flex-shrink: 0; background: var(--sticky-bg); color: var(--sticky-text); border-top: 4px solid var(--border-color);
+            padding: 1rem 2rem; padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+            display: none; justify-content: space-between; align-items: center; gap: 1rem; z-index: 100;
+            box-shadow: 0 -6px 0px var(--yellow); position: relative;
+        }
+        .sticky-bar.active { display: flex; flex-wrap: wrap; }
+
+        /* TOMBOL TOGGLE COLAPSE */
+        .sticky-toggle-btn {
+            position: absolute; top: -20px; left: 50%; transform: translateX(-50%);
+            background: var(--yellow); color: #000; border: 3px solid var(--border-color);
+            width: 40px; height: 30px; font-family: 'Archivo Black', sans-serif; cursor: pointer; z-index: 101;
+            display: flex; align-items: center; justify-content: center; box-shadow: 3px 3px 0px var(--border-color);
+        }
+        .sticky-toggle-btn:hover { transform: translateX(-50%) translateY(2px); box-shadow: none; }
+        .sticky-bar.collapsed { padding-top: 1.5rem; }
+        .sticky-bar.collapsed .settings-group,
+        .sticky-bar.collapsed .reset-btn,
+        .sticky-bar.collapsed .stats-text { display: none !important; }
+
+        .settings-group { display: flex; gap: 1.5rem; flex-wrap: wrap; flex: 1; min-width: 200px; align-items: flex-end; }
+        
+        .setting-item { display: flex; flex-direction: column; gap: 0.5rem; min-width: 150px; }
+        .setting-item label { font-family: 'Archivo Black', sans-serif; font-size: 0.8rem; text-transform: uppercase; color: var(--sticky-text); }
+        .setting-item select {
+            background: var(--sticky-text); color: var(--sticky-bg); border: 3px solid var(--sticky-text);
+            padding: 0.4rem; font-weight: 700; font-family: 'Space Mono', monospace; outline: none; width: 100%;
+        }
+
+        .stats-text { color: var(--sticky-text); font-size: 0.85rem; font-weight: 700; margin-bottom: 0.5rem; text-transform: uppercase; text-align: right; line-height: 1.5; }
+        .stats-text span.yellow { color: var(--yellow); }
+        .btn-group { display: flex; gap: 1rem; flex-wrap: wrap; }
+        .action-btn {
+            border: 4px solid var(--sticky-text); box-shadow: 4px 4px 0px var(--sticky-text); padding: 0.8rem 1.5rem;
+            font-family: 'Archivo Black', sans-serif; font-size: 1rem; text-transform: uppercase; text-decoration: none;
+            cursor: pointer; transition: 0.1s; display: inline-block; text-align: center; color: #000;
+        }
+        .action-btn:hover:not(:disabled) { transform: translate(4px, 4px); box-shadow: none; }
+        .create-pdf-btn { background: var(--green); }
+        .reset-btn { background: var(--pink); }
+        .action-btn:disabled { background: var(--gray); cursor: not-allowed; opacity: 0.6; box-shadow: none; transform: none; }
+
+        @media (max-width: 768px) {
+            .tool-title { font-size: 2rem; }
+            .sticky-bar { flex-direction: column; align-items: stretch; padding: 1rem; }
+            .settings-group { width: 100%; }
+            .btn-group { width: 100%; justify-content: center; }
+            .action-btn { flex: 1; }
+            .stats-text { text-align: center; }
+            .fs-drop-overlay h2 { font-size: 2rem; padding: 2rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="app-shell" id="appShell">
+        <nav class="navbar">
+            <a href="index.html" class="logo">DSH</a>
+            <div class="nav-group">
+                <div class="nav-links"><a href="index.html">Home</a></div>
+                <button id="themeToggle" class="theme-btn">🌙</button>
+            </div>
+        </nav>
+
+        <main class="scrollable-content">
+            <div class="tool-container">
+                <h1 class="tool-title">IMAGE TO PDF</h1>
+                <div class="tool-desc">GABUNGIN BANYAK GAMBAR JADI 1 PDF!</div>
+
+                <div class="drop-zone" id="dropZone">
+                    <h3>TARIK & LEPASKAN GAMBAR DI SINI</h3>
+                    <p>Atau klik untuk memilih file</p>
+                    <input type="file" id="fileInput" accept="image/*" multiple>
+                </div>
+
+                <div class="preview-section" id="previewSection">
+                    <div class="image-grid" id="imageGrid"></div>
+                </div>
+            </div>
+        </main>
+
+        <div class="sticky-bar" id="stickyBar">
+            <button class="sticky-toggle-btn" id="stickyToggle">▼</button>
+            <div class="settings-group">
+                <div class="setting-item">
+                    <label for="pageSizeSelect">UKURAN KERTAS:</label>
+                    <select id="pageSizeSelect">
+                        <option value="auto">AUTO FIT (Ukuran Foto)</option>
+                        <option value="portrait">A4 PORTRAIT (Tegak)</option>
+                        <option value="landscape">A4 LANDSCAPE (Lebar)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="btn-group" style="display: flex; gap: 1rem; flex-wrap: wrap;">
+                <div class="stats-text" id="statsText">Total: 0 Gambar</div>
+                <button class="action-btn reset-btn" id="resetBtn">HAPUS</button>
+                <button class="action-btn create-pdf-btn" id="createPdfBtn" disabled>CREATE PDF</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="fs-drop-overlay" id="fsDropOverlay">
+        <h2>LEPASKAN FILE DI SINI</h2>
+    </div>
+
+    <script>
+        // JS PAKSA TINGGI LAYAR ANTI BUG
+        function adjustAppHeight() {
+            const appShell = document.getElementById('appShell');
+            if (!appShell) return;
+            const visibleHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+            appShell.style.height = visibleHeight + 'px';
+        }
+        window.addEventListener('resize', adjustAppHeight);
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', adjustAppHeight);
+            window.visualViewport.addEventListener('scroll', adjustAppHeight);
+        }
+        adjustAppHeight();
+        setTimeout(adjustAppHeight, 500);
+
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const previewSection = document.getElementById('previewSection');
+        const imageGrid = document.getElementById('imageGrid');
+        const stickyBar = document.getElementById('stickyBar');
+        const statsText = document.getElementById('statsText');
+        const resetBtn = document.getElementById('resetBtn');
+        const createPdfBtn = document.getElementById('createPdfBtn');
+        const themeToggle = document.getElementById('themeToggle');
+        const stickyToggle = document.getElementById('stickyToggle');
+        const pageSizeSelect = document.getElementById('pageSizeSelect');
+        const fsDropOverlay = document.getElementById('fsDropOverlay');
+
+        let processedImages = []; 
+        let dragCounter = 0;
+
+        themeToggle.addEventListener('click', () => {
+            document.body.classList.toggle('dark-mode');
+            if (document.body.classList.contains('dark-mode')) themeToggle.textContent = '☀️';
+            else themeToggle.textContent = '🌙';
+        });
+
+        // LOGIC TUTUP BUKA PANEL
+        stickyToggle.addEventListener('click', () => {
+            stickyBar.classList.toggle('collapsed');
+            if (stickyBar.classList.contains('collapsed')) stickyToggle.textContent = '▲';
+            else stickyToggle.textContent = '▼';
+        });
+
+        function formatBytes(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            else if (bytes < 1048576) return (bytes / 1024).toFixed(2) + ' KB';
+            else return (bytes / 1048576).toFixed(2) + ' MB';
+        }
+
+        function updateUIState() {
+            const totalFiles = processedImages.length;
+            const loadedCount = processedImages.filter(img => img.loaded).length;
+            const isProcessing = loadedCount < totalFiles;
+
+            statsText.innerHTML = `Total: ${totalFiles} Gambar`;
+
+            if (isProcessing || totalFiles === 0) {
+                createPdfBtn.disabled = true;
+                createPdfBtn.textContent = totalFiles === 0 ? "CREATE PDF" : `LOADING... (${loadedCount} / ${totalFiles})`;
+            } else {
+                createPdfBtn.disabled = false;
+                createPdfBtn.textContent = "CREATE PDF";
+            }
+        }
+
+        function handleFiles(fileList) {
+            const filesArray = Array.from(fileList);
+            if (filesArray.length > 50) {
+                alert('WOY! Batas maksimal 50 gambar sekaligus biar HP/laptop kamu nggak nge-freeze!');
+                return;
+            }
+            
+            const skippedFiles = [];
+
+            filesArray.forEach(file => {
+                if (!file.type.startsWith('image/')) {
+                    skippedFiles.push(file.name);
+                    return;
+                }
+                
+                const imageId = 'img-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+                const imgData = {
+                    id: imageId,
+                    file: file,
+                    originalName: file.name,
+                    originalSize: file.size,
+                    originalUrl: null,
+                    width: 0,
+                    height: 0,
+                    loaded: false
+                };
+                processedImages.push(imgData);
+
+                const card = document.createElement('div');
+                card.className = 'image-card';
+                card.id = imageId;
+                card.innerHTML = `
+                    <button class="card-delete-btn" data-id="${imageId}">X</button>
+                    <div class="spinner" id="${imageId}-spinner"></div>
+                    <img id="${imageId}-preview" src="" alt="PDF Preview" style="display:none;">
+                    <div class="card-info">
+                        <span id="${imageId}-info">Loading...</span>
+                    </div>
+                `;
+                imageGrid.appendChild(card);
+
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    imgData.originalUrl = e.target.result;
+                    
+                    // Load image to get dimensions
+                    const img = new Image();
+                    img.onload = function() {
+                        imgData.width = img.width;
+                        imgData.height = img.height;
+                        imgData.loaded = true;
+                        
+                        document.getElementById(imgData.id + '-spinner').style.display = 'none';
+                        const imgEl = document.getElementById(imgData.id + '-preview');
+                        imgEl.src = imgData.originalUrl;
+                        imgEl.style.display = 'block';
+                        
+                        document.getElementById(imgData.id + '-info').innerHTML = 
+                            `<strong>${img.width}x${img.height}px</strong><br>${formatBytes(imgData.originalSize)}`;
+                        
+                        updateUIState();
+                    };
+                    img.src = imgData.originalUrl;
+                };
+                reader.readAsDataURL(file);
+            });
+
+            if (skippedFiles.length > 0) {
+                alert(`WOY! File ${skippedFiles.join(', ')} di-skip karena bukan gambar!`);
+            }
+
+            previewSection.classList.add('active');
+            stickyBar.classList.add('active');
+            updateUIState();
+        }
+
+        // EVENT LISTENER UNTUK HAPUS KARTU
+        imageGrid.addEventListener('click', (e) => {
+            if (e.target.classList.contains('card-delete-btn')) {
+                const idToDelete = e.target.getAttribute('data-id');
+                processedImages = processedImages.filter(img => img.id !== idToDelete);
+                const card = document.getElementById(idToDelete);
+                if (card) card.remove();
+                if (processedImages.length === 0) {
+                    previewSection.classList.remove('active');
+                    stickyBar.classList.remove('active');
+                }
+                updateUIState();
+            }
+        });
+
+        // LOGIC CREATE PDF
+        createPdfBtn.addEventListener('click', () => {
+            if (createPdfBtn.disabled) return;
+            
+            createPdfBtn.textContent = "CREATING PDF...";
+            createPdfBtn.style.background = 'var(--blue)';
+
+            const { jsPDF } = window.jspdf;
+            const pageSize = pageSizeSelect.value;
+            
+            let doc;
+            let isFirstPage = true;
+
+            for (const imgData of processedImages) {
+                if (!imgData.loaded) continue;
+
+                const format = imgData.file.type === 'image/png' ? 'PNG' : 'JPEG';
+
+                if (pageSize === 'auto') {
+                    // Halaman ngikutin ukuran gambar (dalam pixel)
+                    if (isFirstPage) {
+                        doc = new jsPDF({ orientation: imgData.width > imgData.height ? 'landscape' : 'portrait', unit: 'px', format: [imgData.width, imgData.height] });
+                        isFirstPage = false;
+                    } else {
+                        doc.addPage([imgData.width, imgData.height], imgData.width > imgData.height ? 'landscape' : 'portrait');
+                    }
+                    // Gambar full halaman
+                    doc.addImage(imgData.originalUrl, format, 0, 0, imgData.width, imgData.height);
+                } else {
+                    // A4 Portrait atau Landscape
+                    const orientation = pageSize; // 'portrait' or 'landscape'
+                    if (isFirstPage) {
+                        doc = new jsPDF({ orientation: orientation, unit: 'mm', format: 'a4' });
+                        isFirstPage = false;
+                    } else {
+                        doc.addPage();
+                    }
+                    
+                    const pageWidth = doc.internal.pageSize.getWidth();
+                    const pageHeight = doc.internal.pageSize.getHeight();
+                    const margin = 10; // 10mm margin
+                    const availWidth = pageWidth - (margin * 2);
+                    const availHeight = pageHeight - (margin * 2);
+                    
+                    // Hitung aspect ratio biar muat di tengah
+                    const imgRatio = imgData.width / imgData.height;
+                    const availRatio = availWidth / availHeight;
+                    
+                    let drawWidth, drawHeight;
+                    if (imgRatio > availRatio) {
+                        drawWidth = availWidth;
+                        drawHeight = availWidth / imgRatio;
+                    } else {
+                        drawHeight = availHeight;
+                        drawWidth = availHeight * imgRatio;
+                    }
+                    
+                    const x = (pageWidth - drawWidth) / 2;
+                    const y = (pageHeight - drawHeight) / 2;
+                    
+                    doc.addImage(imgData.originalUrl, format, x, y, drawWidth, drawHeight);
+                }
+            }
+
+            doc.save("DSH-Tools-Image.pdf");
+            
+            createPdfBtn.textContent = "CREATE PDF";
+            createPdfBtn.style.background = 'var(--green)';
+        });
+
+        // LOGIC DRAG & DROP FULLSCREEN
+        document.addEventListener('dragenter', (e) => { e.preventDefault(); dragCounter++; fsDropOverlay.classList.add('active'); });
+        document.addEventListener('dragover', (e) => { e.preventDefault(); });
+        document.addEventListener('dragleave', (e) => {
+            e.preventDefault(); dragCounter--;
+            if (dragCounter <= 0) { dragCounter = 0; fsDropOverlay.classList.remove('active'); }
+        });
+        document.addEventListener('drop', (e) => {
+            e.preventDefault(); dragCounter = 0; fsDropOverlay.classList.remove('active');
+            if (e.dataTransfer.files.length > 0) handleFiles(e.dataTransfer.files);
+        });
+
+        resetBtn.addEventListener('click', () => {
+            processedImages = [];
+            imageGrid.innerHTML = '';
+            previewSection.classList.remove('active');
+            stickyBar.classList.remove('active');
+            fileInput.value = '';
+        });
+
+        dropZone.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', (e) => { if (e.target.files.length > 0) handleFiles(e.target.files); });
+    </script>
+</body>
+</html>
