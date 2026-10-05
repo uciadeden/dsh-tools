@@ -288,54 +288,28 @@
             background: var(--card-bg); padding: 1rem;
             display: flex; flex-direction: column; align-items: center; position: relative;
         }
-        
         .ba-container {
-            position: relative; 
-            width: 90vw; 
-            max-width: 1000px;
-            height: 70vh; 
-            overflow: hidden;
-            border: 3px solid var(--border-color); 
-            cursor: ew-resize;
-            background: #111; /* Biar background gelap pas ada jeda */
-            display: flex;
-            justify-content: center;
-            align-items: center;
+            position: relative; width: 90vw; max-width: 1000px; height: 70vh; overflow: hidden;
+            border: 3px solid var(--border-color); cursor: ew-resize; background: #111;
+            display: flex; justify-content: center; align-items: center;
         }
         .ba-img {
-            position: absolute;
-            top: 0; left: 0;
-            width: 100%;
-            height: 100%;
-            object-fit: contain; /* Paksa gambar nge-fit sempurna biar numpuk */
-            user-select: none;
-            -webkit-user-drag: none;
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            object-fit: contain; user-select: none; -webkit-user-drag: none;
         }
-        .ba-img-before {
-            clip-path: inset(0 50% 0 0); /* Default 50% */
-            z-index: 10;
-        }
+        .ba-img-before { clip-path: inset(0 50% 0 0); z-index: 10; }
         .ba-slider-line {
-            position: absolute; top: 0; bottom: 0; left: 50%;
-            width: 4px; background: var(--yellow);
-            transform: translateX(-50%); pointer-events: none;
-            z-index: 20;
+            position: absolute; top: 0; bottom: 0; left: 50%; width: 4px; background: var(--yellow);
+            transform: translateX(-50%); pointer-events: none; z-index: 20;
         }
         .ba-slider-handle {
-            position: absolute; top: 50%; left: 50%;
-            transform: translate(-50%, -50%);
-            background: var(--yellow); color: #000;
-            border: 2px solid var(--border-color);
-            width: 30px; height: 30px;
-            display: flex; align-items: center; justify-content: center;
-            font-weight: bold; font-size: 1.2rem;
-            z-index: 21;
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--yellow); color: #000;
+            border: 2px solid var(--border-color); width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;
+            font-weight: bold; font-size: 1.2rem; z-index: 21;
         }
         .modal-close-btn {
-            background: var(--yellow); color: #000;
-            border: 3px solid var(--border-color);
-            padding: 0.5rem 1.5rem; font-family: 'Archivo Black', sans-serif;
-            cursor: pointer; box-shadow: 3px 3px 0px var(--border-color); margin-top: 1rem;
+            background: var(--yellow); color: #000; border: 3px solid var(--border-color); padding: 0.5rem 1.5rem;
+            font-family: 'Archivo Black', sans-serif; cursor: pointer; box-shadow: 3px 3px 0px var(--border-color); margin-top: 1rem;
         }
 
         /* STICKY BAR BAWAH */
@@ -685,6 +659,40 @@
 
                     canvas.toBlob(function(blob) {
                         if (!blob) return;
+                        
+                        // ANTI BLOAT: Kalau hasil compress malah lebih gede, balikin ke file asli
+                        if (blob.size >= imgData.originalSize) {
+                            if (imgData.blobUrl) URL.revokeObjectURL(imgData.blobUrl);
+                            imgData.blob = imgData.file; // Pakai file asli
+                            imgData.blobUrl = URL.createObjectURL(imgData.file);
+                            imgData.compressedSize = imgData.file.size;
+                            
+                            document.getElementById(imgData.id + '-spinner').style.display = 'none';
+                            const imgEl = document.getElementById(imgData.id + '-preview');
+                            imgEl.src = imgData.blobUrl;
+                            imgEl.style.display = 'block';
+                            
+                            const ext = imgData.originalName.split('.').pop().toLowerCase();
+                            const btnEl = document.getElementById(imgData.id + '-btn');
+                            btnEl.href = imgData.blobUrl;
+                            btnEl.download = `dsh-${getFileNameWithoutExt(imgData.originalName)}.${ext}`;
+                            btnEl.style.display = 'block';
+                            
+                            document.getElementById(imgData.id + '-copy').style.display = 'block';
+                            document.getElementById(imgData.id + '-info').innerHTML = 
+                                `${formatBytes(imgData.originalSize)} → <strong>Tidak Bisa Dikecilin</strong>`;
+                            
+                            const rateElement = document.getElementById(imgData.id + '-rate');
+                            rateElement.textContent = `NO CHANGE`;
+                            rateElement.style.background = 'var(--gray)';
+                            rateElement.style.color = '#000';
+                            rateElement.style.display = 'inline-block';
+
+                            updateUIState();
+                            return; // Hentikan proses
+                        }
+
+                        // Kalau hasilnya memang kecil, lanjutkan normal
                         if (imgData.blobUrl) URL.revokeObjectURL(imgData.blobUrl);
                         
                         imgData.blob = blob;
@@ -697,7 +705,6 @@
                         imgEl.style.display = 'block';
                         
                         const ext = imgData.originalName.split('.').pop().toLowerCase();
-                        
                         const btnEl = document.getElementById(imgData.id + '-btn');
                         btnEl.href = imgData.blobUrl;
                         btnEl.download = `dsh-${getFileNameWithoutExt(imgData.originalName)}.${ext}`;
